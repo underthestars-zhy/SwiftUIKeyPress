@@ -1,5 +1,14 @@
 import SwiftUI
 
+#if os(macOS)
+
+typealias UIViewControllerRepresentable = NSViewControllerRepresentable
+typealias UIViewController = NSViewController
+typealias UIHostingController = NSHostingController
+public typealias UIKey = String
+
+#endif
+
 public extension View {
     func onKeyPress(_ keys: Binding<[UIKey]>) -> some View {
         self
@@ -9,6 +18,11 @@ public extension View {
     func onKeyPress(_ action: @escaping ([UIKey]) -> ()) -> some View {
         self
             .modifier(DoOnKeyPressModifier(action: action))
+    }
+    
+    func onKeyUpdate(_ action: @escaping ([UIKey]) -> ()) -> some View {
+        self
+            .modifier(DoOnUpdateKeyPressModifier(action: action))
     }
 }
 
@@ -35,8 +49,33 @@ struct DoOnKeyPressModifier: ViewModifier {
     }
 }
 
+struct DoOnUpdateKeyPressModifier: ViewModifier {
+    @State var keys: [UIKey] = []
+    @State var last: [UIKey] = []
+    
+    var action: ([UIKey]) -> ()
+    
+    func body(content: Content) -> some View {
+        content
+            .background(KeyPressView(keys: $keys))
+            .onChange(of: keys) { newValue in
+#if !os(macOS)
+                action(newValue[last.endIndex...].map { $0 })
+                last = newValue
+#else
+                action(newValue[last.endIndex...].map { String($0) })
+                last = newValue
+#endif
+            }
+    }
+}
+
 struct KeyPressView: UIViewControllerRepresentable {
+#if !os(macOS)
     typealias UIViewControllerType = KeyPressViewController
+    
+    typealias NSViewControllerType = KeyPressViewController
+#endif
     
     class Coordinator: NSObject, KeyPressViewControllerDelegate {
         var parent: KeyPressView
@@ -45,9 +84,15 @@ struct KeyPressView: UIViewControllerRepresentable {
             self.parent = parent
         }
         
+#if os(macOS)
+        func tap(_ key: String) {
+            self.parent.keys.append(key)
+        }
+#else
         func tap(_ key: [UIKey]) {
             self.parent.keys.append(contentsOf: key)
         }
+#endif
     }
     
     @Binding var keys: [UIKey]
@@ -56,6 +101,7 @@ struct KeyPressView: UIViewControllerRepresentable {
         Coordinator(self)
     }
     
+#if !os(macOS)
     func makeUIViewController(context: Context) -> KeyPressViewController {
         let controller = KeyPressViewController()
         controller.delegate = context.coordinator
@@ -65,6 +111,17 @@ struct KeyPressView: UIViewControllerRepresentable {
     func updateUIViewController(_ uiViewController: KeyPressViewController, context: Context) {
         
     }
+#else
+    func makeNSViewController(context: Context) -> KeyPressViewController {
+        let controller = KeyPressViewController()
+        controller.delegate = context.coordinator
+        return controller
+    }
+    
+    func updateNSViewController(_ nsViewController: KeyPressViewController, context: Context) {
+        
+    }
+#endif
 }
 
 class KeyPressViewController: UIViewController {
@@ -72,8 +129,21 @@ class KeyPressViewController: UIViewController {
     
     override func viewDidLoad() {
         self.view.addSubview(UIHostingController(rootView: Color.clear.id(UUID())).view)
+        
+#if os(macOS)
+        NSEvent.addLocalMonitorForEvents(matching: .keyDown) {
+            self.keyDown(with: $0)
+            return $0
+        }
+        
+        NSEvent.addLocalMonitorForEvents(matching: .flagsChanged) {
+            self.flagsChanged(with: $0)
+            return $0
+        }
+#endif
     }
     
+#if !os(macOS)
     override func pressesBegan(_ presses: Set<UIPress>, with event: UIPressesEvent?) {
         var result = [UIKey]()
         for press in presses {
@@ -86,8 +156,36 @@ class KeyPressViewController: UIViewController {
         
         super.pressesBegan(presses, with: event)
     }
+#else
+    override func keyDown(with event: NSEvent) {
+        if let key = event.characters {
+            delegate?.tap(key)
+        }
+    }
+    
+    override func loadView() {
+        self.view = KeyView()
+    }
+    
+    override var acceptsFirstResponder: Bool {
+        true
+    }
+    
+    class KeyView: NSView {
+        override var acceptsFirstResponder: Bool { true }
+        
+        override func keyDown(with event: NSEvent) {
+            
+        }
+    }
+    
+#endif
 }
 
 protocol KeyPressViewControllerDelegate {
+#if !os(macOS)
     func tap(_ key: [UIKey])
+#else
+    func tap(_ key: String)
+#endif
 }
