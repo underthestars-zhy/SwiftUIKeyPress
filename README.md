@@ -2,7 +2,7 @@
 
 SwiftUIKeyPress is a package to make up for the lack of keyboard input in SwiftUI.
 
-!()[SwiftUIKeyPress]
+![](SwiftUIKeyPress)
 
 ## How to use?
 
