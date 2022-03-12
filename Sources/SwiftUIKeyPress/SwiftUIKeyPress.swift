@@ -128,8 +128,6 @@ class KeyPressViewController: UIViewController {
     var delegate: KeyPressViewControllerDelegate? = nil
     
     override func viewDidLoad() {
-        self.view.addSubview(UIHostingController(rootView: Color.clear.id(UUID())).view)
-        
 #if os(macOS)
         NSEvent.addLocalMonitorForEvents(matching: .keyDown) {
             self.keyDown(with: $0)
@@ -140,6 +138,9 @@ class KeyPressViewController: UIViewController {
             self.flagsChanged(with: $0)
             return $0
         }
+#else
+        view.backgroundColor = .red
+        view.layer.opacity = 0.1
 #endif
     }
     
@@ -147,7 +148,8 @@ class KeyPressViewController: UIViewController {
     override func pressesBegan(_ presses: Set<UIPress>, with event: UIPressesEvent?) {
         var result = [UIKey]()
         for press in presses {
-            guard let key = press.key else { continue }
+            guard let key = press.key else {
+                continue }
             
             result.append(key)
         }
@@ -156,6 +158,8 @@ class KeyPressViewController: UIViewController {
         
         super.pressesBegan(presses, with: event)
     }
+    
+    
 #else
     override func keyDown(with event: NSEvent) {
         if let key = event.characters {
