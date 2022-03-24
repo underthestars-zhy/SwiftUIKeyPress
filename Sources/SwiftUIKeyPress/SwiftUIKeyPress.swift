@@ -5,7 +5,11 @@ import SwiftUI
 typealias UIViewControllerRepresentable = NSViewControllerRepresentable
 typealias UIViewController = NSViewController
 typealias UIHostingController = NSHostingController
-public typealias UIKey = String
+public struct UIKey: Equatable {
+    public let characters: String?
+    public let flag: NSEvent.ModifierFlags?
+    public let event: NSEvent
+}
 
 #endif
 
@@ -63,7 +67,7 @@ struct DoOnUpdateKeyPressModifier: ViewModifier {
                 action(newValue[last.endIndex...].map { $0 })
                 last = newValue
 #else
-                action(newValue[last.endIndex...].map { String($0) })
+                action(newValue[last.endIndex...].map { $0 })
                 last = newValue
 #endif
             }
@@ -85,7 +89,7 @@ struct KeyPressView: UIViewControllerRepresentable {
         }
         
 #if os(macOS)
-        func tap(_ key: String) {
+        func tap(_ key: UIKey) {
             self.parent.keys.append(key)
         }
 #else
@@ -162,9 +166,7 @@ class KeyPressViewController: UIViewController {
     
 #else
     override func keyDown(with event: NSEvent) {
-        if let key = event.characters {
-            delegate?.tap(key)
-        }
+        delegate?.tap(UIKey.init(characters: event.characters, flag: event.modifierFlags, event: event))
     }
     
     override func loadView() {
@@ -190,6 +192,6 @@ protocol KeyPressViewControllerDelegate {
 #if !os(macOS)
     func tap(_ key: [UIKey])
 #else
-    func tap(_ key: String)
+    func tap(_ key: UIKey)
 #endif
 }
